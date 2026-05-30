@@ -145,8 +145,14 @@ VideoReader::~VideoReader(){
 
 void VideoReader::SetVideoStream(int stream_nb) {
     if (!fmt_ctx_) return;
-    AVCodec *dec;
+    const AVCodec *dec;
+#if LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(59, 0, 100)
+    AVCodec *dec_tmp = nullptr;
+    int st_nb = av_find_best_stream(fmt_ctx_.get(), AVMEDIA_TYPE_VIDEO, stream_nb, -1, &dec_tmp, 0);
+    dec = dec_tmp;
+#else
     int st_nb = av_find_best_stream(fmt_ctx_.get(), AVMEDIA_TYPE_VIDEO, stream_nb, -1, &dec, 0);
+#endif
     // LOG(INFO) << "find best stream: " << st_nb;
     CHECK_GE(st_nb, 0) << "ERROR cannot find video stream with wanted index: " << stream_nb;
     // initialize the mem for codec context
@@ -554,9 +560,16 @@ double VideoReader::GetRotation() const {
     if (rotate && *rotate->value && strcmp(rotate->value, "0"))
         theta = atof(rotate->value);
 
+#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(60, 0, 100)
+    const AVPacketSideData *sd = av_packet_side_data_get(
+        active_st->codecpar->coded_side_data, active_st->codecpar->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+    if (sd && !theta)
+        theta = -av_display_rotation_get((int32_t*) sd->data);
+#else
     uint8_t* displaymatrix = av_stream_get_side_data(active_st, AV_PKT_DATA_DISPLAYMATRIX, NULL);
     if (displaymatrix && !theta)
         theta = -av_display_rotation_get((int32_t*) displaymatrix);
+#endif
 
     theta = std::fmod(theta, 360);
     if(theta < 0) theta += 360;

@@ -128,7 +128,11 @@ namespace decord {
                 pCodecParameters = tempCodecParameters;
                 originalSampleRate = tempCodecParameters->sample_rate;
                 if (targetSampleRate == -1) targetSampleRate = originalSampleRate;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 0, 100)
+                numChannels = tempCodecParameters->ch_layout.nb_channels;
+#else
                 numChannels = tempCodecParameters->channels;
+#endif
                 break;
             }
         }
@@ -148,7 +152,9 @@ namespace decord {
         if (codecOpenRet < 0) {
             char errstr[200];
             av_strerror(codecOpenRet, errstr, 200);
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(60, 0, 100)
             avcodec_close(pCodecContext);
+#endif
             avcodec_free_context(&pCodecContext);
             avformat_close_input(&pFormatContext);
             LOG(FATAL) << "ERROR open codec through avcodec_open2: " << errstr;
@@ -210,9 +216,11 @@ namespace decord {
         // clean up
         av_frame_free(&pFrame);
         av_packet_free(&pPacket);
-        avcodec_close(pCodecContext);
         swr_close(swr);
         swr_free(&swr);
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(60, 0, 100)
+        avcodec_close(pCodecContext);
+#endif
         avcodec_free_context(&pCodecContext);
         avformat_close_input(&pFormatContext);
     }
@@ -229,7 +237,11 @@ namespace decord {
         // allocate resample buffer
         float** outBuffer;
         int outLinesize = 0;
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 0, 100)
+        int outNumChannels = mono ? 1 : pFrame->ch_layout.nb_channels;
+#else
         int outNumChannels = av_get_channel_layout_nb_channels(mono ? AV_CH_LAYOUT_MONO : pFrame->channel_layout);
+#endif
         numChannels = outNumChannels;
         int outNumSamples = av_rescale_rnd(pFrame->nb_samples,
                                            this->targetSampleRate, pFrame->sample_rate, AV_ROUND_UP);
@@ -281,11 +293,18 @@ namespace decord {
         if (!this->swr) {
             LOG(FATAL) << "ERROR Failed to allocate resample context";
         }
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(57, 0, 100)
+        av_opt_set_chlayout(this->swr, "in_channel_layout", &pCodecContext->ch_layout, 0);
+        AVChannelLayout out_layout;
+        av_channel_layout_default(&out_layout, mono ? 1 : pCodecContext->ch_layout.nb_channels);
+        av_opt_set_chlayout(this->swr, "out_channel_layout", &out_layout, 0);
+#else
         if (pCodecContext->channel_layout == 0) {
-            pCodecContext->channel_layout = av_get_default_channel_layout( pCodecContext->channels );
+            pCodecContext->channel_layout = av_get_default_channel_layout(pCodecContext->channels);
         }
         av_opt_set_channel_layout(this->swr, "in_channel_layout",  pCodecContext->channel_layout, 0);
         av_opt_set_channel_layout(this->swr, "out_channel_layout", mono ? AV_CH_LAYOUT_MONO : pCodecContext->channel_layout,  0);
+#endif
         av_opt_set_int(this->swr, "in_sample_rate",     pCodecContext->sample_rate,                0);
         av_opt_set_int(this->swr, "out_sample_rate",    this->targetSampleRate,                0);
         av_opt_set_sample_fmt(this->swr, "in_sample_fmt",  pCodecContext->sample_fmt, 0);

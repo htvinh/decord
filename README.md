@@ -43,11 +43,11 @@ pip install decord
 
 Supported platforms:
 
-- [x] Linux
-- [x] Mac OS >= 10.12, python>=3.5
-- [x] Windows
+-   [x] Linux (x86_64, aarch64)
+-   [x] macOS >= 10.12, python>=3.5 (Intel + Apple Silicon)
+-   [x] Windows
 
-**Note that only CPU versions are provided with PYPI now. Please build from source to enable GPU acclerator.**
+**Note: PyPI only ships x86_64 CPU wheels. For Apple Silicon or GPU support, build from source.**
 
 
 ### Install from source
@@ -57,8 +57,6 @@ Supported platforms:
 Install the system packages for building the shared library, for Debian/Ubuntu users, run:
 
 ```bash
-# official PPA comes with ffmpeg 2.8, which lacks tons of features, we use ffmpeg 4.0 here
-sudo add-apt-repository ppa:jonathonf/ffmpeg-4 # for ubuntu20.04 official PPA is already version 4.2, you may skip this step
 sudo apt-get update
 sudo apt-get install -y build-essential python3-dev python3-setuptools make cmake
 sudo apt-get install -y ffmpeg libavcodec-dev libavfilter-dev libavformat-dev libavutil-dev
@@ -91,16 +89,10 @@ Note that if you encountered the an issue with `libnvcuvid.so` (e.g., see [#102]
 
 To specify a customized FFMPEG library path, use `-DFFMPEG_DIR=/path/to/ffmpeg".
 
-Install python bindings:
+Install python bindings (from repo root):
 
 ```bash
-cd ../python
-# option 1: add python path to $PYTHONPATH, you will need to install numpy separately
-pwd=$PWD
-echo "PYTHONPATH=$PYTHONPATH:$pwd" >> ~/.bashrc
-source ~/.bashrc
-# option 2: install with setuptools
-python3 setup.py install --user
+pip install -e ./python
 ```
 
 #### Mac OS
@@ -122,32 +114,34 @@ brew install cmake ffmpeg
 # note: make sure you have cmake 3.8 or later, you can install from cmake official website if it's too old
 ```
 
-Clone the repo recursively(important)
+On **Apple Silicon (M1/M2/M3)** machines, Homebrew installs to `/opt/homebrew/`. pkg-config will auto-detect FFmpeg there, so no special flags are needed.
+
+Clone the repo recursively (important):
 
 ```bash
 git clone --recursive https://github.com/dmlc/decord
 ```
 
-Then go to root directory build shared library:
+Build the shared library:
 
 ```bash
 cd decord
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make
+cmake .. -DUSE_CUDA=0 -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.ncpu)
 ```
 
-Install python bindings:
+Install python bindings (from repo root):
 
 ```bash
-cd ../python
-# option 1: add python path to $PYTHONPATH, you will need to install numpy separately
-pwd=$PWD
-echo "PYTHONPATH=$PYTHONPATH:$pwd" >> ~/.bash_profile
-source ~/.bash_profile
-# option 2: install with setuptools
-python3 setup.py install --user
+pip install -e ./python
 ```
+
+> **Note for Apple Silicon:** The codebase has been patched for FFmpeg ≥ 7.0 API compatibility (Homebrew `ffmpeg` 8.x). If you use a different FFmpeg version, the following files may need adjustments:
+> - `src/video/ffmpeg/ffmpeg_common.h` — `#include <libavcodec/bsf.h>` required for FFmpeg 7+
+> - `src/video/video_reader.cc` — `av_find_best_stream` 5th arg is `const AVCodec**`; `av_stream_get_side_data` replaced with `av_packet_side_data_get`
+> - `src/audio/audio_reader.cc` — `ch_layout` replaces `channels`/`channel_layout`; `avcodec_close` removed
+> - `src/video/ffmpeg/filter_graph.cc` — pixel format enforced via filter description, not `av_opt_set_int_list`
 
 #### Windows
 

@@ -215,7 +215,21 @@ void FFMPEGThreadedDecoder::WorkerThreadImpl() {
             }
         } else {
             // normal mode, push in valid packets and retrieve frames
-            CHECK_GE(avcodec_send_packet(dec_ctx_.get(), pkt.get()), 0) << "Thread worker: Error sending packet.";
+            // avcodec_send_packet may return EAGAIN if the decoder has pending
+            // output frames that need to be received first
+            int send_ret;
+            while ((send_ret = avcodec_send_packet(dec_ctx_.get(), pkt.get())) == AVERROR(EAGAIN)) {
+                int recv = avcodec_receive_frame(dec_ctx_.get(), frame.get());
+                if (recv == 0) {
+                    NDArray out_buf;
+                    bool get_buf = buffer_queue_->Pop(&out_buf);
+                    if (!get_buf) return;
+                    ProcessFrame(frame, out_buf);
+                } else if (recv != AVERROR(EAGAIN) && recv != AVERROR_EOF) {
+                    LOG(FATAL) << "Thread worker: Error decoding frame during drain: " << recv;
+                }
+            }
+            CHECK_GE(send_ret, 0) << "Thread worker: Error sending packet: " << send_ret;
             got_picture = avcodec_receive_frame(dec_ctx_.get(), frame.get());
             if (got_picture == 0) {
                 NDArray out_buf;

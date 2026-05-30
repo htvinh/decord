@@ -36,9 +36,6 @@ void FFMPEGFilterGraph::Init(std::string filters_descr, AVCodecContext *dec_ctx)
     CHECK(buffersink) << "Error: no buffersink";
     AVFilterInOut *outputs = avfilter_inout_alloc();
 	AVFilterInOut *inputs  = avfilter_inout_alloc();
-	enum AVPixelFormat pix_fmts[] = { AV_PIX_FMT_RGB24 , AV_PIX_FMT_NONE };
-	// AVBufferSinkParams *buffersink_params;
-
 	filter_graph_.reset(avfilter_graph_alloc());
 	/* set threads to 1, details see https://github.com/dmlc/decord/pull/63 */
 	//LOG(INFO) << "Original GraphFilter nb_threads: " << filter_graph_->nb_threads;
@@ -65,12 +62,11 @@ void FFMPEGFilterGraph::Init(std::string filters_descr, AVCodecContext *dec_ctx)
     /* buffer video sink: to terminate the filter chain. */
 	// buffersink_params = av_buffersink_params_alloc();
 	// buffersink_params->pixel_fmts = pix_fmts;
-	CHECK_GE(avfilter_graph_create_filter(&buffersink_ctx_, buffersink, "out",
+    CHECK_GE(avfilter_graph_create_filter(&buffersink_ctx_, buffersink, "out",
 		NULL, NULL, filter_graph_.get()), 0) << "Cannot create buffer sink";
-	// av_free(buffersink_params);
-    // LOG(INFO) << "create filter sink";
-    // CHECK_GE(av_opt_set_bin(buffersink_ctx_, "pix_fmts", (uint8_t *)&pix_fmts, sizeof(AV_PIX_FMT_RGB24), AV_OPT_SEARCH_CHILDREN), 0) << "Set bin error";
-    CHECK_GE(av_opt_set_int_list(buffersink_ctx_, "pix_fmts", pix_fmts, AV_PIX_FMT_NONE, AV_OPT_SEARCH_CHILDREN), 0) << "Set output pixel format error.";
+
+    // ensure RGB24 output by appending format filter to the description
+    filters_descr += ",format=rgb24";
 
     // LOG(INFO) << "create filter set opt";
     /* Endpoints for the filter graph. */
