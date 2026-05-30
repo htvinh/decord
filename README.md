@@ -49,6 +49,8 @@ Supported platforms:
 
 **Note: PyPI only ships x86_64 CPU wheels. For Apple Silicon or GPU support, build from source.**
 
+> Apple Silicon users: use the [`modern-support`](https://github.com/htvinh/decord/tree/modern-support) branch which includes FFmpeg 7.x/8.x compatibility patches.
+
 
 ### Install from source
 
@@ -63,10 +65,21 @@ sudo apt-get install -y ffmpeg libavcodec-dev libavfilter-dev libavformat-dev li
 # note: make sure you have cmake 3.8 or later, you can install from cmake official website if it's too old
 ```
 
-Clone the repo recursively(important)
+Clone the repo recursively (important):
 
 ```bash
+# Apple Silicon users: use the modern-support branch for FFmpeg 8.x compat
+git clone --recursive -b modern-support https://github.com/htvinh/decord.git
+# or the upstream version (requires FFmpeg 4.x):
 git clone --recursive https://github.com/dmlc/decord
+```
+
+If you already cloned `dmlc/decord`, switch to the fork:
+```bash
+git remote add htv https://github.com/htvinh/decord.git
+git fetch htv
+git checkout -b modern-support htv/modern-support
+git submodule update --init --recursive
 ```
 
 Build the shared library in source root directory:
@@ -119,7 +132,8 @@ On **Apple Silicon (M1/M2/M3)** machines, Homebrew installs to `/opt/homebrew/`.
 Clone the repo recursively (important):
 
 ```bash
-git clone --recursive https://github.com/dmlc/decord
+# Apple Silicon: use the modern-support branch
+git clone --recursive -b modern-support https://github.com/htvinh/decord.git
 ```
 
 Build the shared library:
@@ -137,11 +151,7 @@ Install python bindings (from repo root):
 pip install -e ./python
 ```
 
-> **Note for Apple Silicon:** The codebase has been patched for FFmpeg ≥ 7.0 API compatibility (Homebrew `ffmpeg` 8.x). If you use a different FFmpeg version, the following files may need adjustments:
-> - `src/video/ffmpeg/ffmpeg_common.h` — `#include <libavcodec/bsf.h>` required for FFmpeg 7+
-> - `src/video/video_reader.cc` — `av_find_best_stream` 5th arg is `const AVCodec**`; `av_stream_get_side_data` replaced with `av_packet_side_data_get`
-> - `src/audio/audio_reader.cc` — `ch_layout` replaces `channels`/`channel_layout`; `avcodec_close` removed
-> - `src/video/ffmpeg/filter_graph.cc` — pixel format enforced via filter description, not `av_opt_set_int_list`
+> **Apple Silicon:** The `modern-support` branch includes FFmpeg 7.x/8.x compatibility (Homebrew `ffmpeg` 8.x) with version guards for FFmpeg ≥ 4.2.
 
 #### Windows
 
