@@ -108,6 +108,12 @@ Install python bindings (from repo root):
 pip install -e ./python
 ```
 
+You may also need additional packages for helper scripts:
+```bash
+pip install pillow
+```
+(decord itself only requires `numpy`, which is installed automatically.)
+
 #### Mac OS
 
 Installation on macOS is similar to Linux. But macOS users need to install building tools like clang, GNU Make, cmake first.
@@ -152,6 +158,12 @@ pip install -e ./python
 ```
 
 > **Apple Silicon:** The `modern-support` branch includes FFmpeg 7.x/8.x compatibility (Homebrew `ffmpeg` 8.x) with version guards for FFmpeg ≥ 4.2.
+
+You may also need additional packages for helper scripts:
+```bash
+pip install pillow
+```
+(decord itself only requires `numpy`, which is installed automatically.)
 
 #### Windows
 
